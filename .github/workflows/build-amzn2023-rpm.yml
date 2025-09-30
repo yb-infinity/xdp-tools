@@ -49,8 +49,6 @@ jobs:
               libpcap-devel \
               pkgconfig \
               m4 \
-              emacs-nox \
-              wireshark-cli \
               bpftool \
               tar \
               gzip \
@@ -97,6 +95,18 @@ jobs:
 
             # Copy spec file
             cp packaging/rpm/xdp-tools.spec ~/rpmbuild/SPECS/
+
+            # Patch spec file to disable emacs and wireshark dependencies
+            echo \"Patching spec file...\"
+            sed -i 's/^BuildRequires:    emacs-nox/# BuildRequires:    emacs-nox/' ~/rpmbuild/SPECS/xdp-tools.spec
+            sed -i 's/^BuildRequires:    wireshark-cli/# BuildRequires:    wireshark-cli/' ~/rpmbuild/SPECS/xdp-tools.spec
+            sed -i '/^export FORCE_EMACS=1/c\\export FORCE_EMACS=0' ~/rpmbuild/SPECS/xdp-tools.spec
+            echo \"Spec file patched successfully.\"
+
+            # Set build environment variables
+            export FORCE_EMACS=0
+            export FORCE_SYSTEM_LIBBPF=0
+            echo \"Build environment: FORCE_EMACS=0, FORCE_SYSTEM_LIBBPF=0\"
 
             # Build RPM
             cd ~/rpmbuild/SPECS
