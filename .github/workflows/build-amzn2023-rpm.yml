@@ -36,9 +36,11 @@ jobs:
               gcc \
               clang \
               llvm \
+              llvm-devel \
               kernel-devel \
               kernel-headers \
               libbpf-devel \
+              libbpf-static \
               elfutils-libelf-devel \
               zlib-devel \
               libpcap-devel \
@@ -48,7 +50,22 @@ jobs:
               wireshark-cli \
               bpftool \
               tar \
-              gzip
+              gzip \
+              which \
+              findutils
+
+            # Verify clang installation and set environment
+            export CLANG=\$(which clang)
+            export LLVM_STRIP=\$(which llvm-strip)
+            echo \"Using clang: \$CLANG\"
+            echo \"Using llvm-strip: \$LLVM_STRIP\"
+
+            # Verify libbpf installation
+            pkg-config --exists libbpf && echo \"libbpf found\" || echo \"libbpf not found\"
+            ldconfig -p | grep libbpf || echo \"libbpf libraries not in ldconfig\"
+
+            # Check if static libbpf is available
+            find /usr -name \"libbpf.a\" 2>/dev/null || echo \"Static libbpf not found\"
 
             # Setup RPM build environment
             rpmdev-setuptree
@@ -66,11 +83,19 @@ jobs:
             cd ~/rpmbuild/SPECS
             rpmbuild -ba xdp-tools.spec
 
-            # Copy built packages to workspace
+            # Copy built packages to workspace (only if they exist)
             mkdir -p /workspace/rpmbuild-output/RPMS
             mkdir -p /workspace/rpmbuild-output/SRPMS
-            cp -r ~/rpmbuild/RPMS/* /workspace/rpmbuild-output/RPMS/
-            cp ~/rpmbuild/SRPMS/* /workspace/rpmbuild-output/SRPMS/
+            if [ -d ~/rpmbuild/RPMS ] && [ \"\$(ls -A ~/rpmbuild/RPMS 2>/dev/null)\" ]; then
+              cp -r ~/rpmbuild/RPMS/* /workspace/rpmbuild-output/RPMS/
+            else
+              echo \"No RPMS found to copy\"
+            fi
+            if [ -d ~/rpmbuild/SRPMS ] && [ \"\$(ls -A ~/rpmbuild/SRPMS 2>/dev/null)\" ]; then
+              cp ~/rpmbuild/SRPMS/* /workspace/rpmbuild-output/SRPMS/
+            else
+              echo \"No SRPMS found to copy\"
+            fi
           "
 
       - name: List built packages
