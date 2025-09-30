@@ -26,9 +26,10 @@ jobs:
       - name: Build in Amazon Linux 2023 container
         run: |
           docker run --rm -v "$PWD":/workspace -w /workspace amazonlinux:2023 /bin/bash -c "
-            # Install dependencies
-            dnf update -y
-            dnf install -y \
+            # Install dependencies quietly
+            echo \"Installing dependencies...\"
+            dnf update -y -q
+            dnf install -y -q \
               git \
               rpm-build \
               rpmdevtools \
@@ -39,6 +40,7 @@ jobs:
               llvm-devel \
               kernel-devel \
               kernel-headers \
+              libbpf \
               libbpf-devel \
               libbpf-static \
               elfutils-libelf-devel \
@@ -54,6 +56,7 @@ jobs:
               gzip \
               which \
               findutils
+            echo \"Dependencies installed successfully.\"
 
             # Verify clang installation and set environment
             export CLANG=\$(which clang)
@@ -62,21 +65,25 @@ jobs:
             echo \"Using llvm-strip: \$LLVM_STRIP\"
 
             # Verify libbpf installation
-            pkg-config --exists libbpf && echo \"libbpf found\" || echo \"libbpf not found\"
-            pkg-config --libs libbpf || echo \"Failed to get libbpf libs\"
+            echo \"=== Checking libbpf installation ===\"
+            dnf list installed | grep libbpf || echo \"No libbpf packages found\"
+
+            pkg-config --exists libbpf && echo \"libbpf pkg-config: FOUND\" || echo \"libbpf pkg-config: NOT FOUND\"
+            pkg-config --modversion libbpf 2>/dev/null && echo \"libbpf version: \$(pkg-config --modversion libbpf)\" || echo \"Failed to get libbpf version\"
+            pkg-config --libs libbpf 2>/dev/null && echo \"libbpf libs: \$(pkg-config --libs libbpf)\" || echo \"Failed to get libbpf libs\"
+            pkg-config --cflags libbpf 2>/dev/null && echo \"libbpf cflags: \$(pkg-config --cflags libbpf)\" || echo \"Failed to get libbpf cflags\"
+
+            echo \"=== Checking dynamic libraries ===\"
             ldconfig -p | grep -E \"libbpf|libelf|libz\" || echo \"Required libraries not in ldconfig\"
 
-            # Check if static libbpf is available
-            find /usr -name \"libbpf.a\" 2>/dev/null || echo \"Static libbpf not found\"
+            echo \"=== Checking static libraries ===\"
+            find /usr -name \"libbpf.a\" 2>/dev/null && echo \"Static libbpf found\" || echo \"Static libbpf not found\"
+            find /usr -name \"libelf.a\" 2>/dev/null && echo \"Static libelf found\" || echo \"Static libelf not found\"
 
-            # Check for ELF libraries (needed by libbpf)
-            find /usr -name \"libelf.so*\" 2>/dev/null || echo \"libelf.so not found\"
-            find /usr -name \"libelf.a\" 2>/dev/null || echo \"libelf.a not found\"
-
-            # Test simple compilation with libbpf
+            echo \"=== Testing compilation ===\"
             echo \"#include <bpf/libbpf.h>\" > test.c
             echo \"int main() { return 0; }\" >> test.c
-            gcc test.c -lbpf -lelf -lz && echo \"libbpf compilation test passed\" || echo \"libbpf compilation test failed\"
+            gcc test.c -lbpf -lelf -lz && echo \"libbpf compilation test: PASSED\" || echo \"libbpf compilation test: FAILED\"
             rm -f test.c a.out
 
             # Setup RPM build environment
