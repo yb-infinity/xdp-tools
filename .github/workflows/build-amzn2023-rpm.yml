@@ -148,3 +148,32 @@ jobs:
             rpmbuild-output/RPMS/**/*.rpm
             rpmbuild-output/SRPMS/*.rpm
           retention-days: 30
+
+      - name: Upload RPM packages to Fury
+        if: success() && github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/amzn2023')
+        env:
+          FURY_TOKEN: ${{ secrets.FURY_TOKEN }}
+        run: |
+          if [ -z "$FURY_TOKEN" ]; then
+            echo "FURY_TOKEN is not set. Skipping upload to Fury."
+            exit 0
+          fi
+
+          echo "Uploading RPM packages to Fury..."
+
+          # Upload all RPM packages
+          for rpm_file in $(find rpmbuild-output -name "*.rpm" -type f); do
+            echo "Uploading: $rpm_file"
+            response=$(curl -f -s -w "%{http_code}" -F package=@"$rpm_file" "https://${FURY_TOKEN}@push.fury.io/drakemazzy/")
+            http_code="${response: -3}"
+
+            if [ "$http_code" = "200" ]; then
+              echo "✓ Successfully uploaded: $(basename "$rpm_file")"
+            else
+              echo "✗ Failed to upload: $(basename "$rpm_file") (HTTP $http_code)"
+              echo "Response: ${response%???}"  # Remove last 3 characters (HTTP code)
+              exit 1
+            fi
+          done
+
+          echo "All RPM packages uploaded successfully to Fury!"
