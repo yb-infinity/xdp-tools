@@ -1,0 +1,87 @@
+name: Build Amazon Linux 2023 RPM
+
+on:
+  push:
+    branches: [main, amzn2023]
+  pull_request:
+    branches: [main, amzn2023]
+
+jobs:
+  build-rpm:
+    strategy:
+      matrix:
+        include:
+          - runner: wrk0
+            arch: x86_64
+          - runner: rpi5
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build in Amazon Linux 2023 container
+        run: |
+          docker run --rm -v "$PWD":/workspace -w /workspace amazonlinux:2023 /bin/bash -c "
+            # Install dependencies
+            dnf update -y
+            dnf install -y \
+              git \
+              rpm-build \
+              rpmdevtools \
+              make \
+              gcc \
+              clang \
+              llvm \
+              kernel-devel \
+              kernel-headers \
+              libbpf-devel \
+              elfutils-libelf-devel \
+              zlib-devel \
+              libpcap-devel \
+              pkgconfig \
+              m4 \
+              emacs-nox \
+              wireshark-cli \
+              bpftool \
+              tar \
+              gzip
+
+            # Setup RPM build environment
+            rpmdev-setuptree
+
+            # Create source archive
+            ./mkarchive.sh
+
+            # Copy source archive to SOURCES
+            cp *.tar.gz ~/rpmbuild/SOURCES/
+
+            # Copy spec file
+            cp packaging/rpm/xdp-tools.spec ~/rpmbuild/SPECS/
+
+            # Build RPM
+            cd ~/rpmbuild/SPECS
+            rpmbuild -ba xdp-tools.spec
+
+            # Copy built packages to workspace
+            mkdir -p /workspace/rpmbuild-output/RPMS
+            mkdir -p /workspace/rpmbuild-output/SRPMS
+            cp -r ~/rpmbuild/RPMS/* /workspace/rpmbuild-output/RPMS/
+            cp ~/rpmbuild/SRPMS/* /workspace/rpmbuild-output/SRPMS/
+          "
+
+      - name: List built packages
+        run: |
+          find rpmbuild-output -name "*.rpm" -type f
+
+      - name: Upload RPM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: amzn2023-rpm-packages-${{ matrix.arch }}
+          path: |
+            rpmbuild-output/RPMS/**/*.rpm
+            rpmbuild-output/SRPMS/*.rpm
+          retention-days: 30
