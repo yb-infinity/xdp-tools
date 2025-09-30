@@ -11,9 +11,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - runner: wrk0
+          - runner: [self-hosted, Linux, X64, dmz]
             arch: x86_64
-          - runner: rpi5
+          - runner: [self-hosted, Linux, ARM64, dmz]
             arch: arm64
     runs-on: ${{ matrix.runner }}
 
