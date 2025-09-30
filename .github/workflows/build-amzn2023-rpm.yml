@@ -101,6 +101,7 @@ jobs:
             sed -i 's/^BuildRequires:    emacs-nox/# BuildRequires:    emacs-nox/' ~/rpmbuild/SPECS/xdp-tools.spec
             sed -i 's/^BuildRequires:    wireshark-cli/# BuildRequires:    wireshark-cli/' ~/rpmbuild/SPECS/xdp-tools.spec
             sed -i '/^export FORCE_EMACS=1/c\\export FORCE_EMACS=0' ~/rpmbuild/SPECS/xdp-tools.spec
+            sed -i '/^export FORCE_SYSTEM_LIBBPF=1/c\\export FORCE_SYSTEM_LIBBPF=0' ~/rpmbuild/SPECS/xdp-tools.spec
             echo \"Spec file patched successfully.\"
 
             # Set build environment variables
@@ -115,15 +116,23 @@ jobs:
             # Copy built packages to workspace (only if they exist)
             mkdir -p /workspace/rpmbuild-output/RPMS
             mkdir -p /workspace/rpmbuild-output/SRPMS
+
+            # Check and copy RPMS
             if [ -d ~/rpmbuild/RPMS ] && [ \"\$(ls -A ~/rpmbuild/RPMS 2>/dev/null)\" ]; then
               cp -r ~/rpmbuild/RPMS/* /workspace/rpmbuild-output/RPMS/
+              echo \"RPMS copied successfully\"
             else
-              echo \"No RPMS found to copy\"
+              echo \"ERROR: No RPMS found - build failed\"
+              exit 1
             fi
+
+            # Check and copy SRPMS
             if [ -d ~/rpmbuild/SRPMS ] && [ \"\$(ls -A ~/rpmbuild/SRPMS 2>/dev/null)\" ]; then
               cp ~/rpmbuild/SRPMS/* /workspace/rpmbuild-output/SRPMS/
+              echo \"SRPMS copied successfully\"
             else
-              echo \"No SRPMS found to copy\"
+              echo \"ERROR: No SRPMS found - build failed\"
+              exit 1
             fi
           "
 
